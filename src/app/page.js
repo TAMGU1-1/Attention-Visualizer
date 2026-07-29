@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
-const EMBEDDING_DIMENSION = 8;
+const EMBEDDING_DIMENSION = 50;
 const QKV_DIMENSION = 8;
 
 function createRandomVector(length) {
@@ -63,7 +63,7 @@ function findNearestEmbeddingTokens(
       token: item.token,
       index,
       similarity: cosineSimilarity(
-        data[selectedIndex].output,
+        data[selectedIndex].embedding, //QKV가 랜덤이라서 일단 임베딩 벡터로 유사도 결과내는걸로 함
         item.embedding
       ),
     }))
@@ -323,9 +323,8 @@ function OutputSimilarWords({
       </h2>
 
       <p className="mt-2 text-sm text-gray-500">
-  Since the Attention Output has the same dimension as the
-  original embeddings, it is compared with all token embeddings
-  using cosine similarity.
+  Each token's embedding is compared with all other token
+  embeddings using cosine similarity to find the most similar words.
       </p>
 
       <p className="mt-2 text-sm text-gray-500">
@@ -374,6 +373,14 @@ export default function Home() {
   const [selectedQueryIndex, setSelectedQueryIndex] =
     useState(null);
   const [error, setError] = useState("");
+// 처음 딱 한 번만 사전 담은 useState 실행해서 받아온 걸 저장
+  const [embeddings, setEmbeddings] = useState(null);
+
+  useEffect(() => {
+    fetch("/glove-50d.json")
+      .then((res) => res.json())
+      .then((dict) => setEmbeddings(dict));
+  }, []);
 
   function handleCalculate() {
     const trimmedSentence = sentence.trim();
@@ -406,9 +413,10 @@ export default function Home() {
     );
 
     const calculatedData = tokens.map((token) => {
-      const embedding = createRandomVector(
-        EMBEDDING_DIMENSION
-      );
+      const lookupKey = token.toLowerCase(); //소문자로 변환 GloVe는 소문자 사전
+      const found = embeddings[lookupKey]; //사전에서 벡터 꺼내기
+      const embedding = found ?? createRandomVector(EMBEDDING_DIMENSION);
+      const isOOV = !found;
 
       const query = multiplyVectorByMatrix(
         embedding,
@@ -427,6 +435,7 @@ export default function Home() {
 
       return {
         token,
+        isOOV,
         embedding,
         query,
         key,
