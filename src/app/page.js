@@ -323,8 +323,9 @@ function OutputSimilarWords({
       </h2>
 
       <p className="mt-2 text-sm text-gray-500">
-        Attention Output is projected into the embedding space
-        and compared with all embeddings using cosine similarity.
+  Since the Attention Output has the same dimension as the
+  original embeddings, it is compared with all token embeddings
+  using cosine similarity.
       </p>
 
       <p className="mt-2 text-sm text-gray-500">
