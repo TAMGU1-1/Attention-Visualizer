@@ -53,19 +53,18 @@ function cosineSimilarity(vectorA, vectorB) {
   return dotProduct(vectorA, vectorB) / denominator;
 }
 
-function findNearestTokens(
+function findNearestEmbeddingTokens(
   data,
-  vectorName,
   selectedIndex,
-  limit = 3
+  limit = 5
 ) {
   return data
     .map((item, index) => ({
       token: item.token,
       index,
       similarity: cosineSimilarity(
-        data[selectedIndex][vectorName],
-        item[vectorName]
+        data[selectedIndex].output,
+        item.embedding
       ),
     }))
     .filter((item) => item.index !== selectedIndex)
@@ -300,7 +299,7 @@ function AttentionDistribution({
   );
 }
 
-function SimilarTokens({
+function OutputSimilarWords({
   data,
   selectedQueryIndex,
 }) {
@@ -311,124 +310,58 @@ function SimilarTokens({
     return null;
   }
 
-  const selectedToken = data[selectedQueryIndex].token;
-
-  const querySimilarTokens = findNearestTokens(
-    data,
-    "query",
-    selectedQueryIndex
-  );
-
-  const keySimilarTokens = findNearestTokens(
-    data,
-    "key",
-    selectedQueryIndex
-  );
-
-  const valueSimilarTokens = findNearestTokens(
-    data,
-    "value",
-    selectedQueryIndex
-  );
-
-  function SimilarityList({
-    title,
-    items,
-    textClassName,
-  }) {
-    return (
-      <div className="rounded-lg border p-5">
-        <h3 className={`mb-4 text-lg font-bold ${textClassName}`}>
-          {title}
-        </h3>
-
-        {items.length === 0 ? (
-          <p className="text-sm text-gray-400">
-            At least two words are required.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {items.map((item, index) => (
-              <div
-                key={`${title}-${item.token}-${item.index}`}
-                className="rounded-lg bg-gray-50 p-3"
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <span className="font-medium">
-                    {index + 1}. {item.token}
-                  </span>
-
-                  <span className="font-mono text-sm">
-                    {item.similarity.toFixed(4)}
-                  </span>
-                </div>
-
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-200">
-                  <div
-                    className="h-full rounded-full bg-blue-600"
-                    style={{
-                      width: `${Math.max(
-                        ((item.similarity + 1) / 2) * 100,
-                        1
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+  const similarWords =
+    findNearestEmbeddingTokens(
+      data,
+      selectedQueryIndex
     );
-  }
 
   return (
     <div className="mt-8 rounded-lg border p-5">
-      <div className="mb-5">
-        <h2 className="text-xl font-bold">
-          Similar Words by Q, K, V
-        </h2>
+      <h2 className="text-xl font-bold">
+        Attention Output Similar Words
+      </h2>
 
-        <p className="mt-1 text-sm text-gray-500">
-          Selected token:{" "}
-          <span className="font-semibold text-blue-700">
-            {selectedToken}
-          </span>
-        </p>
-
-        <p className="mt-2 text-sm text-gray-500">
-          Similarity is calculated using cosine similarity
-          between the selected token and the other tokens in
-          the sentence.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <SimilarityList
-          title="Similar Query Words"
-          items={querySimilarTokens}
-          textClassName="text-green-700"
-        />
-
-        <SimilarityList
-          title="Similar Key Words"
-          items={keySimilarTokens}
-          textClassName="text-red-700"
-        />
-
-        <SimilarityList
-          title="Similar Value Words"
-          items={valueSimilarTokens}
-          textClassName="text-purple-700"
-        />
-      </div>
-
-      <p className="mt-4 text-xs text-gray-400">
-        Because the current embeddings and weight matrices are
-        randomly generated, these results represent similarity
-        inside the generated vector space rather than real
-        linguistic meaning.
+      <p className="mt-2 text-sm text-gray-500">
+        Attention Output is projected into the embedding space
+        and compared with all embeddings using cosine similarity.
       </p>
+
+      <p className="mt-2 text-sm text-gray-500">
+        Selected Token :
+        <span className="font-semibold text-blue-700">
+          {" "}
+          {data[selectedQueryIndex].token}
+        </span>
+      </p>
+
+      <div className="mt-5 space-y-3">
+        {similarWords.map((item, index) => (
+          <div
+            key={item.token}
+            className="rounded-lg bg-gray-50 p-3"
+          >
+            <div className="flex justify-between">
+              <span>
+                {index + 1}. {item.token}
+              </span>
+
+              <span className="font-mono">
+                {item.similarity.toFixed(4)}
+              </span>
+            </div>
+
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-200">
+              <div
+                className="h-full rounded-full bg-orange-500"
+                style={{
+                  width: `${((item.similarity + 1) / 2) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -646,11 +579,7 @@ export default function Home() {
           />
         </div>
 
-        <SimilarTokens
-  data={tokenData}
-  selectedQueryIndex={selectedQueryIndex}
-/>
-
+     
         <div className="mt-8 rounded-lg border p-5">
           <div className="mb-4">
             <h2 className="text-xl font-bold">
@@ -667,6 +596,10 @@ export default function Home() {
             vectorName="output"
             emptyMessage="Attention output vectors will appear here."
             textClassName="text-orange-700"
+          />
+          <OutputSimilarWords
+  data={tokenData}
+  selectedQueryIndex={selectedQueryIndex}
           />
         </div>
       </div>
