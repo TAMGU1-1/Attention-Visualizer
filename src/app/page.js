@@ -5,6 +5,16 @@ import { useState, useEffect } from "react";
 const EMBEDDING_DIMENSION = 50;
 const QKV_DIMENSION = 8;
 
+const EMBEDDING_COLUMN_LABELS = Array.from(
+  { length: EMBEDDING_DIMENSION },
+  (_, index) => `d${index}`
+);
+
+const QKV_COLUMN_LABELS = Array.from(
+  { length: QKV_DIMENSION },
+  (_, index) => `d${index}`
+);
+
 function createRandomVector(length) {
   return Array.from({ length }, () =>
     Number((Math.random() * 2 - 1).toFixed(2))
@@ -89,19 +99,30 @@ function softmax(values) {
   );
 }
 
-function calculateAttentionMatrix(data) {
-  return data.map((queryItem) => {
-    const scores = data.map((keyItem) => {
-      const score = dotProduct(
-        queryItem.query,
-        keyItem.key
-      );
+function calculateRawScores(data) {
+  return data.map((queryItem) =>
+    data.map((keyItem) =>
+      Number(dotProduct(queryItem.query, keyItem.key).toFixed(2))
+    )
+  );
+}
 
-      return score / Math.sqrt(QKV_DIMENSION);
-    });
+function scaleScores(rawScores) {
+  return rawScores.map((row) =>
+    row.map((score) =>
+      Number((score / Math.sqrt(QKV_DIMENSION)).toFixed(2))
+    )
+  );
+}
 
-    return softmax(scores);
-  });
+function applySoftmaxRows(scaledScores) {
+  return scaledScores.map((row) => softmax(row));
+}
+
+function calculateOutputProjection(outputs, outputWeight) {
+  return outputs.map((output) =>
+    multiplyVectorByMatrix(output, outputWeight)
+  );
 }
 
 function calculateAttentionOutputs(data, attentionMatrix) {
@@ -153,90 +174,168 @@ function VectorList({
   );
 }
 
-function AttentionHeatmap({
-  data,
-  attentionMatrix,
-  selectedQueryIndex,
-  onSelectQuery,
+function MatrixHeatmap({
+  matrix,
+  rowLabels,
+  colLabels,
+  cornerLabel = "",
+  mode = "diverging",
+  selectedRowIndex = null,
+  onSelectRow,
+  compact = false,
+  precision = 2,
+  helperText,
 }) {
-  if (data.length === 0 || attentionMatrix.length === 0) {
-    return (
-      <p className="text-gray-400">
-        The attention score matrix will appear here.
-      </p>
-    );
+  if (!matrix || matrix.length === 0) {
+    return <p className="text-gray-400">Values will appear here.</p>;
   }
 
+  const maxAbs =
+    mode === "diverging"
+      ? Math.max(
+          1e-6,
+          ...matrix.flat().map((value) => Math.abs(value))
+        )
+      : 1;
+
+  function cellStyle(value) {
+    if (mode === "sequential") {
+      const opacity = Math.min(0.15 + value * 1.5, 1);
+
+      return {
+        backgroundColor: `rgba(37, 99, 235, ${opacity})`,
+        color: value >= 0.4 ? "white" : "#111827",
+      };
+    }
+
+    const intensity = Math.abs(value) / maxAbs;
+    const opacity = Math.min(0.12 + intensity * 0.85, 1);
+
+    return {
+      backgroundColor:
+        value >= 0
+          ? `rgba(37, 99, 235, ${opacity})`
+          : `rgba(225, 29, 72, ${opacity})`,
+      color: intensity > 0.55 ? "white" : "#111827",
+    };
+  }
+
+  const cellPadding = compact
+    ? "px-2 py-1.5 text-xs"
+    : "px-4 py-3 text-sm";
+
   return (
-    <div className="overflow-x-auto">
-      <p className="mb-4 text-sm text-gray-500">
-        Each row is a Query token and each column is a Key token.
-        Click a row to inspect its attention distribution.
-      </p>
+    <div>
+      {helperText && (
+        <p className="mb-3 text-sm text-gray-500">{helperText}</p>
+      )}
 
-      <table className="min-w-max border-collapse text-center">
-        <thead>
-          <tr>
-            <th className="border bg-gray-100 px-4 py-3 text-sm">
-              Q \ K
-            </th>
+      <div className="relative">
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <table className="min-w-max border-collapse text-center">
+            <thead>
+              <tr>
+                <th
+                  className={`border border-gray-200 bg-slate-50 font-normal italic text-gray-400 ${cellPadding}`}
+                >
+                  {cornerLabel}
+                </th>
 
-            {data.map((item, index) => (
-              <th
-                key={`column-${item.token}-${index}`}
-                className="border bg-gray-100 px-4 py-3 text-sm"
-              >
-                {item.token}
-              </th>
-            ))}
-          </tr>
-        </thead>
-
-        <tbody>
-          {attentionMatrix.map((row, rowIndex) => (
-            <tr
-              key={`row-${rowIndex}`}
-              onClick={() => onSelectQuery(rowIndex)}
-              className="cursor-pointer"
-            >
-              <th
-                className={`border px-4 py-3 text-sm ${
-                  selectedQueryIndex === rowIndex
-                    ? "bg-blue-100 text-blue-800"
-                    : "bg-gray-100"
-                }`}
-              >
-                {data[rowIndex].token}
-              </th>
-
-              {row.map((weight, columnIndex) => {
-                const opacity = Math.min(
-                  0.15 + weight * 1.5,
-                  1
-                );
-
-                return (
-                  <td
-                    key={`cell-${rowIndex}-${columnIndex}`}
-                    className={`border px-4 py-4 font-mono text-sm transition ${
-                      selectedQueryIndex === rowIndex
-                        ? "ring-2 ring-inset ring-blue-300"
-                        : ""
-                    }`}
-                    style={{
-                      backgroundColor: `rgba(37, 99, 235, ${opacity})`,
-                      color: weight >= 0.4 ? "white" : "#111827",
-                    }}
-                    title={`${data[rowIndex].token} attends to ${data[columnIndex].token}: ${weight}`}
+                {colLabels.map((label, index) => (
+                  <th
+                    key={`col-${label}-${index}`}
+                    className={`border border-gray-200 bg-slate-50 font-semibold text-gray-600 ${cellPadding}`}
                   >
-                    {weight.toFixed(4)}
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                    {label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {matrix.map((row, rowIndex) => (
+                <tr
+                  key={`row-${rowIndex}`}
+                  onClick={
+                    onSelectRow ? () => onSelectRow(rowIndex) : undefined
+                  }
+                  className={onSelectRow ? "cursor-pointer" : ""}
+                >
+                  <th
+                    className={`border border-gray-200 font-semibold ${cellPadding} ${
+                      selectedRowIndex === rowIndex
+                        ? "bg-blue-50 text-blue-700"
+                        : `bg-slate-50 text-gray-700 ${
+                            onSelectRow ? "hover:bg-blue-50" : ""
+                          }`
+                    }`}
+                  >
+                    {rowLabels[rowIndex]}
+                  </th>
+
+                  {row.map((value, columnIndex) => (
+                    <td
+                      key={`cell-${rowIndex}-${columnIndex}`}
+                      className={`border border-gray-200 font-mono transition ${cellPadding} ${
+                        selectedRowIndex === rowIndex
+                          ? "ring-2 ring-inset ring-blue-300"
+                          : ""
+                      }`}
+                      style={cellStyle(value)}
+                      title={`${rowLabels[rowIndex]} · ${colLabels[columnIndex]}: ${value}`}
+                    >
+                      {value.toFixed(precision)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {compact && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-10 rounded-r-lg bg-gradient-to-l from-white to-transparent" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FlowConnector({ label }) {
+  return (
+    <div className="flex flex-col items-center py-2">
+      <div className="h-5 w-px bg-gradient-to-b from-gray-300 to-gray-400" />
+
+      <div className="my-1 rounded-full border border-gray-300 bg-white px-3 py-1 font-mono text-xs text-gray-600 shadow-sm">
+        {label}
+      </div>
+
+      <svg
+        width="14"
+        height="9"
+        viewBox="0 0 14 9"
+        className="text-gray-400"
+      >
+        <path d="M0 0 L7 9 L14 0 Z" fill="currentColor" />
+      </svg>
+    </div>
+  );
+}
+
+function FlowStage({ title, formula, children }) {
+  return (
+    <div className="rounded-lg border border-gray-200 p-5">
+      <div className="mb-4">
+        <h2 className="text-xl font-bold">{title}</h2>
+
+        {formula && (
+          <p className="mt-1 font-mono text-sm tracking-tight text-gray-500">
+            {formula}
+          </p>
+        )}
+      </div>
+
+      {children}
     </div>
   );
 }
@@ -367,8 +466,10 @@ function OutputSimilarWords({
 }
 
 export default function Home() {
-  const [sentence, setSentence] = useState("");
+  const [sentence, setSentence] = useState("The cat sat on the chair.");
   const [tokenData, setTokenData] = useState([]);
+  const [rawScores, setRawScores] = useState([]);
+  const [scaledScores, setScaledScores] = useState([]);
   const [attentionMatrix, setAttentionMatrix] = useState([]);
   const [selectedQueryIndex, setSelectedQueryIndex] =
     useState(null);
@@ -387,6 +488,8 @@ export default function Home() {
 
     if (trimmedSentence === "") {
       setTokenData([]);
+      setRawScores([]);
+      setScaledScores([]);
       setAttentionMatrix([]);
       setSelectedQueryIndex(null);
       setError("Please enter a sentence.");
@@ -412,8 +515,15 @@ export default function Home() {
       QKV_DIMENSION
     );
 
+    const outputWeight = createRandomMatrix(
+      QKV_DIMENSION,
+      EMBEDDING_DIMENSION
+    );
+
     const calculatedData = tokens.map((token) => {
-      const lookupKey = token.toLowerCase(); //소문자로 변환 GloVe는 소문자 사전
+      const lookupKey = token
+        .toLowerCase()
+        .replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ""); //양 끝 문장부호 제거 후 GloVe 소문자 사전에서 조회
       const found = embeddings[lookupKey]; //사전에서 벡터 꺼내기
       const embedding = found ?? createRandomVector(EMBEDDING_DIMENSION);
       const isOOV = !found;
@@ -443,23 +553,39 @@ export default function Home() {
       };
     });
 
-    const calculatedAttentionMatrix =
-      calculateAttentionMatrix(calculatedData);
+    const calculatedRawScores = calculateRawScores(calculatedData);
+    const calculatedScaledScores = scaleScores(calculatedRawScores);
+    const calculatedAttentionMatrix = applySoftmaxRows(
+      calculatedScaledScores
+    );
 
     const attentionOutputs = calculateAttentionOutputs(
       calculatedData,
       calculatedAttentionMatrix
     );
 
+    const projectedOutputs = calculateOutputProjection(
+      attentionOutputs,
+      outputWeight
+    );
+
     const finalData = calculatedData.map((item, index) => ({
       ...item,
       output: attentionOutputs[index],
+      projectedOutput: projectedOutputs[index],
     }));
 
     setTokenData(finalData);
+    setRawScores(calculatedRawScores);
+    setScaledScores(calculatedScaledScores);
     setAttentionMatrix(calculatedAttentionMatrix);
     setSelectedQueryIndex(0);
   }
+
+  const tokenLabels = tokenData.map((item) =>
+    item.isOOV ? `${item.token} *` : item.token
+  );
+  const hasOOVTokens = tokenData.some((item) => item.isOOV);
 
   return (
     <main className="min-h-screen bg-gray-100 p-6 md:p-10">
@@ -476,7 +602,7 @@ export default function Home() {
         <textarea
           className="w-full rounded-lg border border-gray-300 p-4 outline-none focus:border-blue-500"
           rows={3}
-          placeholder="Example: The cat sat on the mat."
+          placeholder="Enter a sentence, e.g. The cat sat on the chair."
           value={sentence}
           onChange={(event) => setSentence(event.target.value)}
         />
@@ -492,125 +618,232 @@ export default function Home() {
           Calculate Attention
         </button>
 
-        <div className="mt-10 rounded-lg border p-5">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold">
-              Token Embeddings
-            </h2>
+        {tokenData.length > 0 && selectedQueryIndex !== null && (
+          <p className="mt-6 text-sm text-gray-500">
+            Selected token:{" "}
+            <span className="font-semibold text-blue-700">
+              {tokenData[selectedQueryIndex].token}
+            </span>{" "}
+            — click any row in the heatmaps below to trace a different
+            token through the pipeline.
+          </p>
+        )}
 
-            <p className="mt-1 text-sm text-gray-500">
-              Embedding dimension: {EMBEDDING_DIMENSION}
-            </p>
-          </div>
-
-          <VectorList
-            data={tokenData}
-            vectorName="embedding"
-            emptyMessage="Embeddings will appear here."
-            textClassName="text-blue-700"
-          />
-        </div>
-
-        <div className="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="min-h-60 rounded-lg border p-5">
-            <div className="mb-4">
-              <h2 className="text-xl font-bold">Query (Q)</h2>
-
-              <p className="mt-1 text-sm text-gray-500">
-                Q = Embedding × WQ
-              </p>
-            </div>
-
-            <VectorList
-              data={tokenData}
-              vectorName="query"
-              emptyMessage="Query vectors will appear here."
-              textClassName="text-green-700"
+        <div className="mt-6 flex flex-col">
+          <FlowStage
+            title="Input Embedding"
+            formula={
+              <>GloVe embedding · dimension {EMBEDDING_DIMENSION}</>
+            }
+          >
+            <MatrixHeatmap
+              matrix={tokenData.map((item) => item.embedding)}
+              rowLabels={tokenLabels}
+              colLabels={EMBEDDING_COLUMN_LABELS}
+              cornerLabel="token \\ dim"
+              compact
+              selectedRowIndex={selectedQueryIndex}
+              onSelectRow={setSelectedQueryIndex}
+              helperText={
+                hasOOVTokens
+                  ? "Each row is a token's pretrained embedding vector. * = word not found in the 10k-word GloVe vocabulary — a random vector was used instead."
+                  : "Each row is a token's pretrained embedding vector."
+              }
             />
-          </div>
+          </FlowStage>
 
-          <div className="min-h-60 rounded-lg border p-5">
-            <div className="mb-4">
-              <h2 className="text-xl font-bold">Key (K)</h2>
+          <FlowConnector label="× Wq / Wk / Wv" />
 
-              <p className="mt-1 text-sm text-gray-500">
-                K = Embedding × WK
-              </p>
+          <FlowStage
+            title="Query · Key · Value"
+            formula={
+              <>
+                Q = X·W<sub>Q</sub> &nbsp; K = X·W<sub>K</sub> &nbsp; V =
+                X·W<sub>V</sub>
+              </>
+            }
+          >
+            <div className="flex flex-col gap-6">
+              <div>
+                <h3 className="mb-2 font-semibold text-green-700">
+                  Query (Q)
+                </h3>
+
+                <MatrixHeatmap
+                  matrix={tokenData.map((item) => item.query)}
+                  rowLabels={tokenLabels}
+                  colLabels={QKV_COLUMN_LABELS}
+                  cornerLabel="tok \\ dim"
+                  selectedRowIndex={selectedQueryIndex}
+                  onSelectRow={setSelectedQueryIndex}
+                />
+              </div>
+
+              <div>
+                <h3 className="mb-2 font-semibold text-red-700">
+                  Key (K)
+                </h3>
+
+                <MatrixHeatmap
+                  matrix={tokenData.map((item) => item.key)}
+                  rowLabels={tokenLabels}
+                  colLabels={QKV_COLUMN_LABELS}
+                  cornerLabel="tok \\ dim"
+                  selectedRowIndex={selectedQueryIndex}
+                  onSelectRow={setSelectedQueryIndex}
+                />
+              </div>
+
+              <div>
+                <h3 className="mb-2 font-semibold text-purple-700">
+                  Value (V)
+                </h3>
+
+                <MatrixHeatmap
+                  matrix={tokenData.map((item) => item.value)}
+                  rowLabels={tokenLabels}
+                  colLabels={QKV_COLUMN_LABELS}
+                  cornerLabel="tok \\ dim"
+                  selectedRowIndex={selectedQueryIndex}
+                  onSelectRow={setSelectedQueryIndex}
+                />
+              </div>
             </div>
+          </FlowStage>
 
-            <VectorList
-              data={tokenData}
-              vectorName="key"
-              emptyMessage="Key vectors will appear here."
-              textClassName="text-red-700"
+          <FlowConnector
+            label={
+              <>
+                Q · K<sup>T</sup>
+              </>
+            }
+          />
+
+          <FlowStage
+            title="Raw Attention Scores"
+            formula={
+              <>
+                score<sub>ij</sub> = q<sub>i</sub> · k<sub>j</sub>
+              </>
+            }
+          >
+            <MatrixHeatmap
+              matrix={rawScores}
+              rowLabels={tokenLabels}
+              colLabels={tokenLabels}
+              cornerLabel="Q \\ K"
+              selectedRowIndex={selectedQueryIndex}
+              onSelectRow={setSelectedQueryIndex}
+              helperText="Dot product of every Query with every Key, before scaling."
             />
-          </div>
+          </FlowStage>
 
-          <div className="min-h-60 rounded-lg border p-5">
-            <div className="mb-4">
-              <h2 className="text-xl font-bold">Value (V)</h2>
+          <FlowConnector
+            label={
+              <>
+                ÷ √d<sub>k</sub>
+              </>
+            }
+          />
 
-              <p className="mt-1 text-sm text-gray-500">
-                V = Embedding × WV
-              </p>
-            </div>
-
-            <VectorList
-              data={tokenData}
-              vectorName="value"
-              emptyMessage="Value vectors will appear here."
-              textClassName="text-purple-700"
+          <FlowStage
+            title="Scaled Scores"
+            formula={
+              <>
+                scaled<sub>ij</sub> = score<sub>ij</sub> / √
+                {QKV_DIMENSION}
+              </>
+            }
+          >
+            <MatrixHeatmap
+              matrix={scaledScores}
+              rowLabels={tokenLabels}
+              colLabels={tokenLabels}
+              cornerLabel="Q \\ K"
+              selectedRowIndex={selectedQueryIndex}
+              onSelectRow={setSelectedQueryIndex}
             />
-          </div>
-        </div>
+          </FlowStage>
 
-        <div className="mt-8 min-h-96 rounded-lg border p-5">
-          <div className="mb-5">
-            <h2 className="text-xl font-bold">
-              Attention Heatmap
-            </h2>
+          <FlowConnector label="Softmax (row-wise)" />
 
-            <p className="mt-1 text-sm text-gray-500">
-              Attention(Q, K, V) = Softmax(QKᵀ / √dₖ)V
-            </p>
-          </div>
+          <FlowStage
+            title="Attention Weights"
+            formula={
+              <>
+                Attention(Q, K, V) = Softmax(QK<sup>T</sup> / √d
+                <sub>k</sub>)V
+              </>
+            }
+          >
+            <MatrixHeatmap
+              matrix={attentionMatrix}
+              rowLabels={tokenLabels}
+              colLabels={tokenLabels}
+              cornerLabel="Q \\ K"
+              mode="sequential"
+              precision={4}
+              selectedRowIndex={selectedQueryIndex}
+              onSelectRow={setSelectedQueryIndex}
+              helperText="Each row is a Query token and each column is a Key token. Click a row to inspect its attention distribution."
+            />
 
-          <AttentionHeatmap
-            data={tokenData}
-            attentionMatrix={attentionMatrix}
-            selectedQueryIndex={selectedQueryIndex}
-            onSelectQuery={setSelectedQueryIndex}
+            <AttentionDistribution
+              data={tokenData}
+              attentionMatrix={attentionMatrix}
+              selectedQueryIndex={selectedQueryIndex}
+            />
+          </FlowStage>
+
+          <FlowConnector label="× V (weighted sum)" />
+
+          <FlowStage
+            title="Attention Output"
+            formula={<>Output = Attention Weights × V</>}
+          >
+            <MatrixHeatmap
+              matrix={tokenData.map((item) => item.output)}
+              rowLabels={tokenLabels}
+              colLabels={QKV_COLUMN_LABELS}
+              cornerLabel="tok \\ dim"
+              selectedRowIndex={selectedQueryIndex}
+              onSelectRow={setSelectedQueryIndex}
+            />
+          </FlowStage>
+
+          <FlowConnector
+            label={
+              <>
+                × W<sub>O</sub> (output projection)
+              </>
+            }
           />
 
-          <AttentionDistribution
-            data={tokenData}
-            attentionMatrix={attentionMatrix}
-            selectedQueryIndex={selectedQueryIndex}
-          />
-        </div>
+          <FlowStage
+            title="Output Projection"
+            formula={
+              <>
+                Projected = Output · W<sub>O</sub> (dimension{" "}
+                {EMBEDDING_DIMENSION})
+              </>
+            }
+          >
+            <MatrixHeatmap
+              matrix={tokenData.map((item) => item.projectedOutput)}
+              rowLabels={tokenLabels}
+              colLabels={EMBEDDING_COLUMN_LABELS}
+              cornerLabel="tok \\ dim"
+              compact
+              selectedRowIndex={selectedQueryIndex}
+              onSelectRow={setSelectedQueryIndex}
+              helperText="Attention Output projected back into embedding-space dimensions."
+            />
 
-     
-        <div className="mt-8 rounded-lg border p-5">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold">
-              Attention Output
-            </h2>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Output = Attention Weights × Value
-            </p>
-          </div>
-
-          <VectorList
-            data={tokenData}
-            vectorName="output"
-            emptyMessage="Attention output vectors will appear here."
-            textClassName="text-orange-700"
-          />
-          <OutputSimilarWords
-  data={tokenData}
-  selectedQueryIndex={selectedQueryIndex}
-          />
+            <OutputSimilarWords
+              data={tokenData}
+              selectedQueryIndex={selectedQueryIndex}
+            />
+          </FlowStage>
         </div>
       </div>
     </main>
