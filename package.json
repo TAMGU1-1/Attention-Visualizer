@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "model:build": "node scripts/build-model.mjs",
+    "model:verify": "node scripts/verify-model.mjs",
+    "model:test": "node scripts/test-pipeline.mjs",
+    "model:test-lens": "node scripts/test-vocab-lens.mjs",
+    "analyze": "node scripts/analyze-qkv.mjs"
   },
   "dependencies": {
     "next": "16.2.10",

@@ -46,3 +46,6 @@ next-env.d.ts
 # glove 원본은 용량이 커서 커밋 금지 (결과물 public/glove-50d.json 만 커밋)
 scripts/*.zip
 scripts/*.txt
+
+# HuggingFace 원본 체크포인트 캐시 (결과물 public/models/ 만 커밋)
+scripts/.cache/

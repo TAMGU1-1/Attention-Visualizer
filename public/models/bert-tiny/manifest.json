@@ -1,0 +1,286 @@
+{
+  "modelId": "google/bert_uncased_L-2_H-128_A-2",
+  "hiddenSize": 128,
+  "numHeads": 2,
+  "numLayers": 2,
+  "headDim": 64,
+  "vocabSize": 30522,
+  "maxPositions": 512,
+  "layerNormEps": 1e-12,
+  "core": {
+    "file": "core.f32.bin",
+    "dtype": "f32",
+    "tensors": {
+      "position_embeddings": {
+        "shape": [
+          512,
+          128
+        ],
+        "offset": 0
+      },
+      "token_type_embeddings": {
+        "shape": [
+          2,
+          128
+        ],
+        "offset": 65536
+      },
+      "embeddings_ln.weight": {
+        "shape": [
+          128
+        ],
+        "offset": 65792
+      },
+      "embeddings_ln.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 65920
+      },
+      "layer0.query.weight": {
+        "shape": [
+          128,
+          128
+        ],
+        "offset": 66048
+      },
+      "layer0.query.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 82432
+      },
+      "layer0.key.weight": {
+        "shape": [
+          128,
+          128
+        ],
+        "offset": 82560
+      },
+      "layer0.key.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 98944
+      },
+      "layer0.value.weight": {
+        "shape": [
+          128,
+          128
+        ],
+        "offset": 99072
+      },
+      "layer0.value.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 115456
+      },
+      "layer0.attn_out.weight": {
+        "shape": [
+          128,
+          128
+        ],
+        "offset": 115584
+      },
+      "layer0.attn_out.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 131968
+      },
+      "layer0.ffn_in.weight": {
+        "shape": [
+          128,
+          512
+        ],
+        "offset": 132096
+      },
+      "layer0.ffn_in.bias": {
+        "shape": [
+          512
+        ],
+        "offset": 197632
+      },
+      "layer0.ffn_out.weight": {
+        "shape": [
+          512,
+          128
+        ],
+        "offset": 198144
+      },
+      "layer0.ffn_out.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 263680
+      },
+      "layer0.attn_ln.weight": {
+        "shape": [
+          128
+        ],
+        "offset": 263808
+      },
+      "layer0.attn_ln.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 263936
+      },
+      "layer0.ffn_ln.weight": {
+        "shape": [
+          128
+        ],
+        "offset": 264064
+      },
+      "layer0.ffn_ln.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 264192
+      },
+      "layer1.query.weight": {
+        "shape": [
+          128,
+          128
+        ],
+        "offset": 264320
+      },
+      "layer1.query.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 280704
+      },
+      "layer1.key.weight": {
+        "shape": [
+          128,
+          128
+        ],
+        "offset": 280832
+      },
+      "layer1.key.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 297216
+      },
+      "layer1.value.weight": {
+        "shape": [
+          128,
+          128
+        ],
+        "offset": 297344
+      },
+      "layer1.value.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 313728
+      },
+      "layer1.attn_out.weight": {
+        "shape": [
+          128,
+          128
+        ],
+        "offset": 313856
+      },
+      "layer1.attn_out.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 330240
+      },
+      "layer1.ffn_in.weight": {
+        "shape": [
+          128,
+          512
+        ],
+        "offset": 330368
+      },
+      "layer1.ffn_in.bias": {
+        "shape": [
+          512
+        ],
+        "offset": 395904
+      },
+      "layer1.ffn_out.weight": {
+        "shape": [
+          512,
+          128
+        ],
+        "offset": 396416
+      },
+      "layer1.ffn_out.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 461952
+      },
+      "layer1.attn_ln.weight": {
+        "shape": [
+          128
+        ],
+        "offset": 462080
+      },
+      "layer1.attn_ln.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 462208
+      },
+      "layer1.ffn_ln.weight": {
+        "shape": [
+          128
+        ],
+        "offset": 462336
+      },
+      "layer1.ffn_ln.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 462464
+      },
+      "mlm.dense.weight": {
+        "shape": [
+          128,
+          128
+        ],
+        "offset": 462592
+      },
+      "mlm.dense.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 478976
+      },
+      "mlm.ln.weight": {
+        "shape": [
+          128
+        ],
+        "offset": 479104
+      },
+      "mlm.ln.bias": {
+        "shape": [
+          128
+        ],
+        "offset": 479232
+      },
+      "mlm.bias": {
+        "shape": [
+          30522
+        ],
+        "offset": 479360
+      }
+    }
+  },
+  "wordEmbeddings": {
+    "file": "word-embeddings.f16.bin",
+    "dtype": "f16",
+    "shape": [
+      30522,
+      128
+    ]
+  },
+  "vocabFile": "vocab.txt"
+}
